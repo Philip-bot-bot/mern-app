@@ -155,26 +155,34 @@ router.get("/:id", auth, async (req, res) => {
 // @access   Private
 router.delete("/:id", auth, async (req, res) => {
   try {
-    const todo = await Todo.findById(req.params.id);
+    const { id } = req.params;
 
-    // Check for ObjectId format and todo
-    if (!req.params.id.match(/^[0-9a-fA-F]{24}$/) || !todo) {
+    // Validate ID format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ msg: "Invalid ID format" });
+    }
+
+    const todo = await Todo.findById(id);
+
+    if (!todo) {
       return res.status(404).json({ msg: "Todo not found" });
     }
 
-    // Check user if the todo belongs to authenticated user
+    // Ensure the user owns the todo
     if (todo.user.toString() !== req.user.id) {
       return res.status(401).json({ msg: "User not authorized" });
     }
 
-    await todo.remove();
+    // ✅ Delete the todo
+    await Todo.findByIdAndDelete(id);
 
     res.json({ msg: "Todo removed" });
   } catch (err) {
-    console.error(err.message);
+    console.error("🔥 DELETE /api/todos/:id error:", err.message);
     res.status(500).send("Server Error");
   }
 });
+
 
 // @route    PUT api/todos/complete/:id
 // @desc     Complete a todo
