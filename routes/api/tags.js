@@ -9,7 +9,19 @@ const Tag = require("../../models/Tag");
 // @access   Private
 router.get("/", auth, async (req, res) => {
   try {
-    const tags = await Tag.find();
+    let tags = await Tag.find();
+
+    // Optional: Add default tags if none exist
+    if (tags.length === 0) {
+      tags = await Tag.insertMany([
+        { name: "Work" },
+        { name: "Personal" },
+        { name: "Chores" },
+        { name: "School" }
+      ]);
+      console.log("📌 Default tags inserted.");
+    }
+
     res.json(tags);
   } catch (err) {
     console.error(err.message);
