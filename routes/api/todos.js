@@ -42,15 +42,23 @@ router.post(
 
     try {
       const user = await User.findById(req.user.id).select("-password");
+
       const tag = await Tag.findById(req.body.tagId);
 
+      // 🔐 Check if tag was found
+      if (!tag) {
+        return res.status(400).json({ msg: "Invalid tagId: tag not found." });
+      }
+
       let createdTag = {};
+
       if (tag._id.toString() === "5f5689a2d096a9b777ea4124") {
         const newTag = new Tag({
           name: req.body.tag,
         });
         createdTag = await newTag.save();
       }
+
       const newTodo = new Todo({
         name: user.name,
         tags:
@@ -65,16 +73,82 @@ router.post(
 
       res.json(todo);
     } catch (err) {
-      console.error(err.message);
+      console.error("🔥 Error in POST /api/todos:", err.message);
       res.status(500).send("Server Error");
     }
   }
 );
 
+
+// @route    PUT api/todos/:id
+// @desc     Update a todo
+// @access   Private
 // @route    PUT api/todos/:id
 // @desc     Update a todo
 // @access   Private
 router.put(
+  "/:id",
+  [
+    auth,
+    [
+      check("text", "Todo is required").not().isEmpty(),
+      check("tagId", "Tag is required").not().isEmpty(),
+    ],
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      // Validate ID format
+      if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+        return res.status(400).json({ msg: "Invalid todo ID format" });
+      }
+
+      const todo = await Todo.findById(req.params.id);
+      if (!todo) {
+        return res.status(404).json({ msg: "Todo not found" });
+      }
+
+      // Authorization check
+      if (todo.user.toString() !== req.user.id) {
+        return res.status(401).json({ msg: "User not authorized" });
+      }
+
+      // Find the tag
+      const tag = await Tag.findById(req.body.tagId);
+      if (!tag) {
+        return res.status(400).json({ msg: "Invalid tagId: tag not found." });
+      }
+
+      // Handle "create new tag" scenario
+      let createdTag = {};
+      if (tag._id.toString() === "5f5689a2d096a9b777ea4124") {
+        const newTag = new Tag({
+          name: req.body.tag,
+        });
+        createdTag = await newTag.save();
+      }
+
+      // Update the todo
+      todo.text = req.body.text;
+      todo.tags =
+        tag._id.toString() === "5f5689a2d096a9b777ea4124"
+          ? [createdTag]
+          : [tag];
+
+      await todo.save();
+
+      res.json(todo);
+    } catch (err) {
+      console.error("🔥 PUT /api/todos/:id error:", err.message);
+      res.status(500).send("Server Error");
+    }
+  }
+);
+
   "/:id",
   [
     auth,
@@ -127,7 +201,7 @@ router.put(
       res.status(500).send("Server Error");
     }
   }
-);
+
 
 // @route    GET api/todos/:id
 // @desc     Get todo by ID
